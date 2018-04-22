@@ -4,6 +4,10 @@
  * <Jarrod Puseman>
  * <japu8876>
  * 104003252
+ * 
+ * Jamison McGinley
+ * <jamc3951>
+ * SID
  */
 #include <stdio.h>
 #include <stdlib.h>
