@@ -7,7 +7,7 @@
  * 
  * Jamison McGinley
  * <jamc3951>
- * SID
+ * 105207291
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -185,7 +185,16 @@ int main(int argc, char **argv)
 */
 void eval(char *cmdline) 
 {
-    return;
+    char *argv[MAXARGS];
+    int bg;
+    pid_t pid;
+		printf(" %c \n", cmdline[0]);
+    bg = parseline(cmdline,argv);
+    if(!is_builtin_cmd(argv))
+    {
+    	return;
+    }
+
 }
 
 /* 
@@ -210,6 +219,7 @@ int parseline(const char *cmdline, char **argv)
 
     /* Build the argv list */
     argc = 0;
+
     if (*buf == '\'') {
 	buf++;
 	delim = strchr(buf, '\'');
@@ -224,7 +234,6 @@ int parseline(const char *cmdline, char **argv)
 	buf = delim + 1;
 	while (*buf && (*buf == ' ')) /* ignore spaces */
 	       buf++;
-
 	if (*buf == '\'') {
 	    buf++;
 	    delim = strchr(buf, '\'');
@@ -253,6 +262,11 @@ int parseline(const char *cmdline, char **argv)
  */
 int is_builtin_cmd(char **argv)
 {
+	if (strcmp(argv[1], "exit"))
+	{
+		printf("%s\n", argv[1]);
+		do_exit();
+	}
     return BLTN_UNK;     /* not a builtin command */
 }
 
@@ -261,7 +275,7 @@ int is_builtin_cmd(char **argv)
  */
 void do_exit(void)
 {
-  return;
+  exit(0);
 }
 
 /*
@@ -334,7 +348,9 @@ void sigalrm_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
-    return;
+    printf("Terminating after receipt of SIGINT signal\n");
+    exit(1);
+
 }
 
 /*
