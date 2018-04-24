@@ -188,7 +188,7 @@ void eval(char *cmdline)
     char *argv[MAXARGS];
     int bg;
     pid_t pid;
-		printf(" %c \n", cmdline[0]);
+		printf(" %s \n", cmdline);
     bg = parseline(cmdline,argv);
     if(!is_builtin_cmd(argv))
     {
@@ -262,7 +262,7 @@ int parseline(const char *cmdline, char **argv)
  */
 int is_builtin_cmd(char **argv)
 {
-	if (strcmp(argv[1], "exit"))
+	if (strcmp(**argv, "exit"))
 	{
 		printf("%s\n", argv[1]);
 		do_exit();
