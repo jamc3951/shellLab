@@ -188,7 +188,7 @@ void eval(char *cmdline)
     char *argv[MAXARGS];
     int bg;
     pid_t pid;
-		printf(" %s \n", cmdline);
+		
     bg = parseline(cmdline,argv);
     if(!is_builtin_cmd(argv))
     {
@@ -262,12 +262,26 @@ int parseline(const char *cmdline, char **argv)
  */
 int is_builtin_cmd(char **argv)
 {
-	if (strcmp(**argv, "exit"))
+	printf("%s\n", argv[0]);
+	if (strcmp(argv[0], "exit"))
 	{
-		printf("%s\n", argv[1]);
+		printf("%s\n", argv[0]);
 		do_exit();
 	}
+	else if (strcmp(argv[0], "jobs"))
+	{
+		printf("%s\n", argv[1]);
+		exit(0);
+	}
+	else if (strcmp(argv[0], "&"))
+	{
+		printf("%s\n", argv[1]);
+		exit(0);
+	}
+	else
+	{
     return BLTN_UNK;     /* not a builtin command */
+	}
 }
 
 /*
@@ -275,7 +289,7 @@ int is_builtin_cmd(char **argv)
  */
 void do_exit(void)
 {
-  exit(0);
+  return;
 }
 
 /*
