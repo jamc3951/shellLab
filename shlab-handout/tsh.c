@@ -103,6 +103,7 @@ void unix_error(char *msg);
 void app_error(char *msg);
 typedef void handler_t(int);
 handler_t *Signal(int signum, handler_t *handler);
+pid_t Fork(void);
 
 /*
  * main - The shell's main routine 
@@ -186,15 +187,36 @@ int main(int argc, char **argv)
 void eval(char *cmdline) 
 {
     char *argv[MAXARGS];
+    char buf[MAXLINE];
     int bg;
     pid_t pid;
-		
-    bg = parseline(cmdline,argv);
-    if(!is_builtin_cmd(argv))
-    {
+
+    strcpy(buf,cmdline);		
+    bg = parseline(buf,argv);
+    if (argv[0]==NULL){
     	return;
     }
 
+    if(!is_builtin_cmd(argv))
+    {
+    	if((pid=Fork())==0){
+    		if (execve(argv[0],argv, environ) <0){
+    			printf("%s: Command not found.\n",argv[0]);
+    			exit(0);
+    		}
+    	}
+
+    	/*Parent waits for foreground job to terminate*/
+    	if (!bg){
+    		int status;
+    		if (waitpid(pid ,&status,0)<0){
+    			unix_error("waitfg: waitpid error");
+    		}
+    	}else{
+    		printf("%d %s",pid, cmdline);
+    	}
+    }
+    return;
 }
 
 /* 
@@ -262,26 +284,15 @@ int parseline(const char *cmdline, char **argv)
  */
 int is_builtin_cmd(char **argv)
 {
-	printf("%s\n", argv[0]);
-	if (strcmp(argv[0], "exit"))
-	{
-		printf("%s\n", argv[0]);
+	if (!strcmp(argv[0], "exit")){
 		do_exit();
-	}
-	else if (strcmp(argv[0], "jobs"))
-	{
+	}else if (!strcmp(argv[0], "jobs")){
 		printf("%s\n", argv[1]);
 		exit(0);
+	}else if (!strcmp(argv[0], "&")){
+		return 1;
 	}
-	else if (strcmp(argv[0], "&"))
-	{
-		printf("%s\n", argv[1]);
-		exit(0);
-	}
-	else
-	{
-    return BLTN_UNK;     /* not a builtin command */
-	}
+	return BLTN_UNK;     /* not a builtin command */
 }
 
 /*
@@ -289,7 +300,7 @@ int is_builtin_cmd(char **argv)
  */
 void do_exit(void)
 {
-  return;
+  _exit(0);
 }
 
 /*
@@ -597,4 +608,11 @@ void sigquit_handler(int sig)
 }
 
 
-
+/* Wrapper for fork */
+pid_t Fork(void)
+{
+	pid_t pid;
+	if ((pid=fork())<0)
+		unix_error("Fork Error");
+	return pid;
+}
