@@ -200,6 +200,7 @@ void eval(char *cmdline)
     if(!is_builtin_cmd(argv))
     {
     	if((pid=Fork())==0){
+    		addjob(jobs,pid,1,buf);
     		if (execve(argv[0],argv, environ) <0){
     			printf("%s: Command not found.\n",argv[0]);
     			exit(0);
@@ -212,6 +213,7 @@ void eval(char *cmdline)
     		if (waitpid(pid ,&status,0)<0){
     			unix_error("waitfg: waitpid error");
     		}
+    		removejob(jobs,pid);
     	}else{
     		printf("%d %s",pid, cmdline);
     	}
@@ -237,41 +239,46 @@ int parseline(const char *cmdline, char **argv)
     strcpy(buf, cmdline);
     buf[strlen(buf)-1] = ' ';  /* replace trailing '\n' with space */
     while (*buf && (*buf == ' ')) /* ignore leading spaces */
-	buf++;
+		buf++;
 
     /* Build the argv list */
     argc = 0;
 
     if (*buf == '\'') {
-	buf++;
-	delim = strchr(buf, '\'');
+		buf++;
+		delim = strchr(buf, '\'');
     }
-    else {
-	delim = strchr(buf, ' ');
+    else if(*buf=='&'){
+    	do_ignore_singleton();
+    	argv[0]=NULL;
+    	return 1;
+    }
+    else{
+		delim = strchr(buf, ' ');
     }
 
     while (delim) {
-	argv[argc++] = buf;
-	*delim = '\0';
-	buf = delim + 1;
-	while (*buf && (*buf == ' ')) /* ignore spaces */
+		argv[argc++] = buf;
+		*delim = '\0';
+		buf = delim + 1;
+		while (*buf && (*buf == ' ')) /* ignore spaces */
 	       buf++;
-	if (*buf == '\'') {
-	    buf++;
-	    delim = strchr(buf, '\'');
-	}
-	else {
-	    delim = strchr(buf, ' ');
-	}
+		if (*buf == '\'') {
+	    	buf++;
+	    	delim = strchr(buf, '\'');
+		}
+		else {
+	    	delim = strchr(buf, ' ');
+		}
     }
     argv[argc] = NULL;
     
     if (argc == 0)  /* ignore blank line */
-	return 1;
+		return 1;
 
     /* should the job run in the background? */
     if ((bg = (*argv[argc-1] == '&')) != 0) {
-	argv[--argc] = NULL;
+		argv[--argc] = NULL;
     }
     return bg;
 }
@@ -286,10 +293,25 @@ int is_builtin_cmd(char **argv)
 {
 	if (!strcmp(argv[0], "exit")){
 		do_exit();
-	}else if (!strcmp(argv[0], "jobs")){
-		printf("%s\n", argv[1]);
-		exit(0);
-	}else if (!strcmp(argv[0], "&")){
+	}
+	else if (!strcmp(argv[0], "jobs")){
+		printf("Implement me please. %s wants to be a real boy.\n", argv[0]);
+		do_show_jobs();
+		return 1;
+	}
+	else if (!strcmp(argv[0], "fg")){
+		printf("Implement me please. %s wants to be a real boy.\n", argv[0]);
+		do_bgfg(argv);
+		return 1;
+	}
+	else if (!strcmp(argv[0], "bg")){
+		printf("Implement me please. %s wants to be a real boy.\n", argv[0]);
+		do_bgfg(argv);
+		return 1;
+	}
+	else if (!strcmp(argv[0], "&")){
+		printf("Jamison's a hoe.");
+		do_ignore_singleton();
 		return 1;
 	}
 	return BLTN_UNK;     /* not a builtin command */
@@ -308,7 +330,8 @@ void do_exit(void)
  */
 void do_show_jobs(void)
 {
-  return;
+    showjobs(jobs);
+    return;
 }
 
 /*
@@ -316,7 +339,8 @@ void do_show_jobs(void)
  */
 void do_ignore_singleton(void)
 {
-  return;
+	printf("Ignoring Singleton '&'!\n");
+  	return;
 }
 
 void do_killall(char **argv)
