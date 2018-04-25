@@ -172,7 +172,19 @@ int main(int argc, char **argv)
 
     exit(0); /* control never reaches here */
 }
-  
+ 
+
+
+
+
+
+
+
+
+
+
+
+
 /* 
  * eval - Evaluate the command line that the user has just typed in
  * 
@@ -200,7 +212,7 @@ void eval(char *cmdline)
     if(!is_builtin_cmd(argv))
     {
     	if((pid=Fork())==0){
-    		addjob(jobs,pid,1,buf);
+    		addjob(jobs,pid,FG,buf);
     		if (execve(argv[0],argv, environ) <0){
     			printf("%s: Command not found.\n",argv[0]);
     			exit(0);
@@ -220,6 +232,23 @@ void eval(char *cmdline)
     }
     return;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* 
  * parseline - Parse the command line and build the argv array.
@@ -299,14 +328,13 @@ int is_builtin_cmd(char **argv)
 		do_show_jobs();
 		return 1;
 	}
-	else if (!strcmp(argv[0], "fg")){
+	else if ((!strcmp(argv[0], "fg"))||(!strcmp(argv[0], "bg"))){
 		printf("Implement me please. %s wants to be a real boy.\n", argv[0]);
 		do_bgfg(argv);
 		return 1;
 	}
-	else if (!strcmp(argv[0], "bg")){
-		printf("Implement me please. %s wants to be a real boy.\n", argv[0]);
-		do_bgfg(argv);
+	else if (!strcmp(argv[0], "killall")){
+		do_killall(argv);
 		return 1;
 	}
 	else if (!strcmp(argv[0], "&")){
@@ -345,7 +373,14 @@ void do_ignore_singleton(void)
 
 void do_killall(char **argv)
 {
-  return;
+  	if(argv[1]==NULL){
+  		printf("Killall command must be followed by a delay.\n");
+  		return;
+  	}
+
+  	//Else do all the killing
+  	//use the alarm function???
+  	return;
 }
 
 /* 
@@ -353,6 +388,23 @@ void do_killall(char **argv)
  */
 void do_bgfg(char **argv) 
 {
+	//first check if the job id has been sent ** can also be a pid
+	if (argv[1]==NULL){
+		printf("must include a job id.");
+		return;
+	}
+
+	//The job id has been included
+	if(!strcmp(argv[0],"fg")){ //job will be foreground
+		kill(*argv[1],SIGCONT);
+
+	}
+	else{
+		//command is background
+		kill(*argv[1],SIGCONT);
+		//need to somehow still amke this run in the background
+
+	}
     return;
 }
 
@@ -390,6 +442,8 @@ void sigalrm_handler(int sig)
     return;
 }
 
+
+
 /* 
  * sigint_handler - The kernel sends a SIGINT to the shell whenver the
  *    user types ctrl-c at the keyboard.  Catch it and send it along
@@ -398,7 +452,11 @@ void sigalrm_handler(int sig)
 void sigint_handler(int sig) 
 {
     printf("Terminating after receipt of SIGINT signal\n");
-    exit(1);
+    pid_t pid = fgpid(jobs);
+    if (pid!=0){
+    	kill(-pid,sig);
+    }
+    return;
 
 }
 
@@ -409,6 +467,10 @@ void sigint_handler(int sig)
  */
 void sigtstp_handler(int sig) 
 {
+    pid_t pid = fgpid(jobs);
+    if (pid!=0){
+    	kill(-pid,sig);
+    }
     return;
 }
 
