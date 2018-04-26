@@ -196,12 +196,19 @@ int main(int argc, char **argv)
  * background children don't receive SIGINT (SIGTSTP) from the kernel
  * when we type ctrl-c (ctrl-z) at the keyboard.  
 */
+
+/*In eval, the parent must use sigprocmask to block SIGCHLD signals before it forks the child,
+and then unblock these signals, again using sigprocmask after it adds the child to the job list by
+calling addjob. Since children inherit the blocked vectors of their parents, the child must be sure
+to then unblock SIGCHLD signals before it execs the new program.*/
 void eval(char *cmdline) 
 {
     char *argv[MAXARGS];
     char buf[MAXLINE];
     int bg;
     pid_t pid;
+    sigset_t mask;
+
 
     strcpy(buf,cmdline);		
     bg = parseline(buf,argv);
@@ -211,21 +218,31 @@ void eval(char *cmdline)
 
     if(!is_builtin_cmd(argv))
     {
+    	sigemptyset(&mask);
+    	sigaddset(&mask,SIGCHLD);
+    	sigprocmask(SIG_BLOCK, &mask, NULL); 
     	if((pid=Fork())==0){
-    		addjob(jobs,pid,FG,buf);
+    		sigprocmask(SIG_UNBLOCK, &mask, NULL);
     		if (execve(argv[0],argv, environ) <0){
     			printf("%s: Command not found.\n",argv[0]);
     			exit(0);
     		}
     	}
 
+    	//Add job to system
+    	if (!bg){
+    		addjob(jobs,pid,FG,buf);
+    	}else{
+    		addjob(jobs,pid,BG,buf);
+    	}
+
+    	//Unblock the SIGCHLD
+    	sigprocmask(SIG_UNBLOCK,&mask,NULL);
+
+
     	/*Parent waits for foreground job to terminate*/
     	if (!bg){
-    		int status;
-    		if (waitpid(pid ,&status,0)<0){
-    			unix_error("waitfg: waitpid error");
-    		}
-    		removejob(jobs,pid);
+    		waitfg(pid);
     	}else{
     		printf("%d %s",pid, cmdline);
     	}
@@ -413,7 +430,8 @@ void do_bgfg(char **argv)
  */
 void waitfg(pid_t pid)
 {
-    return;
+	//busy loop around the sleep function?
+	return;
 }
 
 /*****************
@@ -429,6 +447,7 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
+	//one call to waitpid
     return;
 }
 
