@@ -362,17 +362,15 @@ void secretSauce(void);
 																  	return;
 																}
 
-void do_killall(char **argv)
-{
-  	if(argv[1]==NULL){
-  		printf("Killall command must be followed by a delay.\n");
-  		return;
-  	}
-
-  	//Else do all the killing
-  	//use the alarm function???
-  	return;
-}
+																void do_killall(char **argv)
+																{
+																  	if(argv[1]==NULL){
+																  		printf("Killall command must be followed by a delay.\n");
+																  		return;
+																  	}
+																  	alarm(atoi(argv[1]));
+																  	return;
+																}
 
 /* 
  * do_bgfg - Execute the builtin bg and fg commands
@@ -459,15 +457,22 @@ void sigchld_handler(int sig)
     return;
 }
 
-/*
- * sigalrm_handler - The kernel sends a SIGALRM to the shell after
- * alarm(timeout) times out. Catch it and send a SIGINT to every
- * EXISTING (pid != 0) job
- */
-void sigalrm_handler(int sig)
-{
-    return;
-}
+																/*
+																 * sigalrm_handler - The kernel sends a SIGALRM to the shell after
+																 * alarm(timeout) times out. Catch it and send a SIGINT to every
+																 * EXISTING (pid != 0) job
+																 */
+																void sigalrm_handler(int sig)
+																{
+																	int mx = maxjid(jobs);
+																	for (int i=0;i<mx;i++){
+																		if (jobs[i].pid != 0){
+																			kill(-jobs[i].pid,SIGINT);
+																			removejob(jobs,jobs[i].pid);
+																		}
+																	}
+																    return;
+																}
 
 
 
