@@ -18,6 +18,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <time.h>
 
 /* Misc manifest constants */
 #define MAXLINE    1024   /* max line size */
@@ -104,6 +105,8 @@ void app_error(char *msg);
 typedef void handler_t(int);
 handler_t *Signal(int signum, handler_t *handler);
 pid_t Fork(void);
+
+void secretSauce(void);
 
 /*
  * main - The shell's main routine 
@@ -231,20 +234,17 @@ void eval(char *cmdline)
 
     	//Add job to system
     	if (!bg){
-    		addjob(jobs,pid,FG,buf);
+    		if(!addjob(jobs,pid,FG,buf)){
+    			return;
+    		}
+    		sigprocmask(SIG_UNBLOCK,&mask,NULL);
+    		waitfg(pid); //wait for command to finish
+    		return;
     	}else{
+    		sigprocmask(SIG_UNBLOCK,&mask,NULL);
+    		printf("%d %s",pid, cmdline);//Else prints background info
+    		return;
     		addjob(jobs,pid,BG,buf);
-    	}
-
-    	//Unblock the SIGCHLD
-    	sigprocmask(SIG_UNBLOCK,&mask,NULL);
-
-
-    	/*Parent waits for foreground job to terminate*/
-    	if (!bg){
-    		waitfg(pid);
-    	}else{
-    		printf("%d %s",pid, cmdline);
     	}
     }
     return;
@@ -354,9 +354,8 @@ int is_builtin_cmd(char **argv)
 		do_killall(argv);
 		return 1;
 	}
-	else if (!strcmp(argv[0], "&")){
-		printf("Jamison's a hoe.");
-		do_ignore_singleton();
+	else if (!strcmp(argv[0], "SecretSauce")){
+		secretSauce();
 		return 1;
 	}
 	return BLTN_UNK;     /* not a builtin command */
@@ -419,20 +418,39 @@ void do_bgfg(char **argv)
 	else{
 		//command is background
 		kill(*argv[1],SIGCONT);
-		//need to somehow still amke this run in the background
+		//need to somehow still make this run in the background
 
 	}
     return;
 }
 
 /* 
- * waitfg - Block until process pid is no longer the foreground process
+ * waitfg - Block until process pid is no longer the foreground process.
  */
 void waitfg(pid_t pid)
 {
 	//busy loop around the sleep function?
+	if (pid ==0){
+		return;
+	}
+	while(fgpid(jobs)!=0){
+		sleep(1);
+	}
 	return;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /*****************
  * Signal handlers
@@ -496,6 +514,28 @@ void sigtstp_handler(int sig)
 /*********************
  * End signal handlers
  *********************/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /***********************************************
  * Helper routines that manipulate the job list
@@ -720,4 +760,36 @@ pid_t Fork(void)
 	if ((pid=fork())<0)
 		unix_error("Fork Error");
 	return pid;
+}
+
+
+void secretSauce(void){
+	srand(time(NULL));
+	int r = rand() % 100;
+	int lives = 6,guess;
+	printf("Welcome to the secret Sauce. You are a worker for Kroger\n");
+	printf("and are trying to steal the secret sauce percent from world\n");
+	printf("leader in sauces Jamison and Jarrod Sauce Inc. Of course \n");
+	printf("already knew this didn't you. So what's the amount? \n > ");
+
+	while ((lives>0) && (r!=guess)){
+		scanf("%d",&guess);
+		if (guess==r){
+			printf("You win! Good job agent.\n");
+			return;
+		}else if (guess == -42){
+			printf("You quit with the secret code. Goodbye.\n");
+			return;
+		}else if(guess>100){
+			printf("Please enter a number between zero and 100.");
+		}else if(guess<r){
+			printf("Too low. %d lives remain. Try again. \n > ",lives);
+			lives--;
+		}else{
+			printf("Too high. %d lives remain. Try again. \n > ",lives);
+			lives--;
+		}
+	}
+	printf("You ran out of lives. You lose.\n");
+	return;
 }
