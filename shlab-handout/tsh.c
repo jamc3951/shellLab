@@ -155,22 +155,22 @@ void secretSauce(void);
 																    /* Execute the shell's read/eval loop */
 																    while (1) {
 
-																	/* Read command line */
-																	if (emit_prompt) {
-																	    printf("%s", prompt);
-																	    fflush(stdout);
-																	}
-																	if ((fgets(cmdline, MAXLINE, stdin) == NULL) && ferror(stdin))
-																	    app_error("fgets error");
-																	if (feof(stdin)) { /* End of file (ctrl-d) */
-																	    fflush(stdout);
-																	    exit(0);
-																	}
+																		/* Read command line */
+																		if (emit_prompt) {
+																		    printf("%s", prompt);
+																		    fflush(stdout);
+																		}
+																		if ((fgets(cmdline, MAXLINE, stdin) == NULL) && ferror(stdin))
+																		    app_error("fgets error");
+																		if (feof(stdin)) { /* End of file (ctrl-d) */
+																		    fflush(stdout);
+																		    exit(0);
+																		}
 
-																	/* Evaluate the command line */
-																	eval(cmdline);
-																	fflush(stdout);
-																	fflush(stdout);
+																		/* Evaluate the command line */
+																		eval(cmdline);
+																		fflush(stdout);
+																		fflush(stdout);
 																    } 
 
 																    exit(0); /* control never reaches here */
@@ -216,6 +216,7 @@ void secretSauce(void);
 																    	sigprocmask(SIG_BLOCK, &mask, NULL); 
 																    	if((pid=Fork())==0){
 																    		sigprocmask(SIG_UNBLOCK, &mask, NULL);
+																    		setpgid(0,0); //What the assignment said to do
 																    		if (execve(argv[0],argv, environ) <0){
 																    			printf("%s: Command not found.\n",argv[0]);
 																    			exit(0);
@@ -229,11 +230,9 @@ void secretSauce(void);
 																    		}
 																    		sigprocmask(SIG_UNBLOCK,&mask,NULL);
 																    		waitfg(pid); //wait for command to finish
-																    		return;
 																    	}else{
 																    		sigprocmask(SIG_UNBLOCK,&mask,NULL);
 																    		printf("%d %s",pid, cmdline);//Else prints background info
-																    		return;
 																    		addjob(jobs,pid,BG,buf);
 																    	}
 																    }
@@ -380,40 +379,52 @@ void do_killall(char **argv)
  */
 void do_bgfg(char **argv) 
 {
+	int jid;
+	struct job_t* jobby;
 	//first check if the job id has been sent ** can also be a pid
 	if (argv[1]==NULL){
-		printf("must include a job id.");
+		printf("Must include a job id.");
 		return;
 	}
 
+	if (argv[1][0]!='J'){//If we have a process id on our hands
+		jid = get_jid_from_pid(*argv[1]);
+	}else{
+		jid = *argv[1];
+	}
+
+	jobby = getjobid(jobs,jid); //Get the job we wish to alter
+
 	//The job id has been included
 	if(!strcmp(argv[0],"fg")){ //job will be foreground
-		kill(*argv[1],SIGCONT);
+		kill(-(jobby->pid),SIGCONT);
+		jobby->state = FG;
+		waitfg(jobby->pid);
 
 	}
 	else{
 		//command is background
-		kill(*argv[1],SIGCONT);
-		//need to somehow still make this run in the background
-
+		kill(-(jobby->pid),SIGCONT);
+		jobby->state = BG;
 	}
     return;
 }
 
-															/* 
-															 * waitfg - Block until process pid is no longer the foreground process.
-															 */
-															void waitfg(pid_t pid)
-															{
-																//busy loop around the sleep function?
-																if (pid ==0){
-																	return;
-																}
-																while(fgpid(jobs)!=0){
-																	sleep(0);
-																}
-																return;
-															}
+/* 
+ * waitfg - Block until process pid is no longer the foreground process.
+ */
+void waitfg(pid_t pid)
+{
+	printf("I am causing problems?\n");
+	//busy loop around the sleep function?
+	if (pid ==0){
+		return;
+	}
+	// while(fgpid(jobs)!=0){
+	// 	sleep(0);
+	// }
+	return;
+}
 
 
 
