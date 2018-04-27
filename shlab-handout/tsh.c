@@ -420,7 +420,7 @@ void waitfg(pid_t pid)
 	if (pid ==0){
 		return;
 	}
-	// while(fgpid(jobs)!=0){
+	// while(fgpid(jobs)!=0){    ////Un-comment when the jobs array is working. Meaniing sigchild needs to be working.
 	// 	sleep(0);
 	// }
 	return;
@@ -453,6 +453,9 @@ void waitfg(pid_t pid)
 void sigchld_handler(int sig) 
 {
 	//one call to waitpid
+	int status;
+	waitpid(0,&status,WNOHANG);
+	//gotta delete the job in here or something
     return;
 }
 
