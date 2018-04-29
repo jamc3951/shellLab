@@ -318,12 +318,10 @@ int is_builtin_cmd(char **argv)
 		do_exit();
 	}
 	else if (!strcmp(argv[0], "jobs")){
-
 		do_show_jobs();
 		return BLTN_IGNR;
 	}
 	else if ((!strcmp(argv[0], "fg"))||(!strcmp(argv[0], "bg"))){
-
 		do_bgfg(argv);
 		return BLTN_BGFG;
 	}
@@ -383,19 +381,38 @@ void do_bgfg(char **argv)
 	struct job_t* jobby;
 	//first check if the job id has been sent ** can also be a pid
 	if (argv[1]==NULL){
-		printf("Must include a job id.");
+		printf("%s command requires PID or Jjobid argument\n",argv[0]);
 		return;
 	}
 
-	if (argv[1][0]!='J'){//If we have a process id on our hands
-		jid = get_jid_from_pid(*argv[1]);
-	}else{
-		jid = *argv[1];
+	//Check next if the argument is a digit. 
+	if (argv[1][0]!='J' && !isdigit(argv[1][0])){
+		printf("%s: argument must be a PID or Jjobid\n",argv[0]);
+		return;
+
 	}
 
-	jobby = getjobid(jobs,jid); //Get the job we wish to alter
+	//Get the job number and pointer to it in the job array.
+	if (argv[1][0]!='J'){//If we have a process id on our hands
+		pid_t pid = atoi(&argv[1][0]);
+		jid = get_jid_from_pid(pid);
+		jobby = getjobid(jobs,jid); //Get the job we wish to alter
+		if (jobby==NULL){
+			printf("(%d): No such process\n",pid);
+			return;
+		}
+	}else{
+		jid = atoi(&argv[1][1]);
+		jobby = getjobid(jobs,jid); //Get the job we wish to alter
+		if (jobby==NULL){
+			printf("%s: No such job\n",argv[1]);
+			return;
+		}
 
-	//The job id has been included
+	}
+	
+
+	//The job exists
 	if(!strcmp(argv[0],"fg")){ //job will be foreground
 		kill(-(jobby->pid),SIGCONT);
 		jobby->state = FG;
@@ -406,6 +423,7 @@ void do_bgfg(char **argv)
 		//command is background
 		kill(-(jobby->pid),SIGCONT);
 		jobby->state = BG;
+		printf("[%d] (%d) %s", jid, jobby->pid, jobby->cmdline);
 	}
     return;
 }
@@ -422,6 +440,7 @@ void waitfg(pid_t pid)
 	while(fgpid(jobs)!=0){    ////Un-comment when the jobs array is working. Meaniing sigchild needs to be working.
 		sleep(0);
 	}
+	removejob(jobs,0);
 	return;
 }
 
@@ -443,17 +462,17 @@ void sigchld_handler(int sig)
 	int status;
 	pid_t pid; 
 	while((pid = waitpid(-1,&status,WNOHANG|WUNTRACED))>0){ 
-		int jid = get_jid_from_pid(pid);
 		//printf("pid: %d \n",pid);
-		if (WIFEXITED(status)){ //normal exit
+		if (WIFSTOPPED(status)){//job is stopped
+			struct job_t* task = getprocessid(jobs,pid);
+			task->state = ST;
+    		printf("Job [%d] (%d) stopped by signal %d\n",task->jid,task->pid,WSTOPSIG(status));
+    	}else if (WIFSIGNALED(status)){//normally terminated (ctrl-c)
+			struct job_t* task = getprocessid(jobs,pid);
+			printf("Job [%d] (%d) terminated by signal %d\n",task->jid,task->pid,WTERMSIG(status));
 			removejob(jobs,pid);
-
-		}else if (WEXITSTATUS(status)){//normally terminated (ctrl-c)
+		}else if (WIFEXITED(status)){ //normal exit
 			removejob(jobs,pid);
-			printf("Terminated\n");
-
-		}else if (WIFSTOPPED(status)){//job is stopped
-			jobs[jid].state = ST;
 		}
 	}
     return;
@@ -470,7 +489,7 @@ void sigalrm_handler(int sig)
 	for (int i=0;i<mx;i++){
 		if (jobs[i].pid != 0){
 			kill(-jobs[i].pid,SIGINT);
-			//removejob(jobs,jobs[i].pid);
+			removejob(jobs,jobs[i].pid);
 		}
 	}
     return;
@@ -485,11 +504,10 @@ void sigalrm_handler(int sig)
  */
 void sigint_handler(int sig) 
 {
-    printf("Terminating after receipt of SIGINT signal\n");
     pid_t pid = fgpid(jobs);
-    printf("%d \n",pid);
     if (pid>0){
     	kill(-pid,SIGINT);
+    	//removejob(jobs,pid);
     }
     return;
 
@@ -503,8 +521,10 @@ void sigint_handler(int sig)
 void sigtstp_handler(int sig) 
 {
     pid_t pid = fgpid(jobs);
+    //struct job_t* task = getprocessid(jobs,pid);
     if (pid>0){
     	kill(-pid,SIGTSTP);
+    	//task->jid=ST;
     }
     return;
 }
@@ -765,10 +785,10 @@ void secretSauce(void){
 	srand(time(NULL));
 	int r = rand() % 100;
 	int lives = 6,guess;
-	printf("Welcome to the secret Sauce. You are a worker for Kroger\n");
-	printf("and are trying to steal the secret sauce percent from world\n");
-	printf("leader in sauces Jamison and Jarrod Sauce Inc. Of course \n");
-	printf("already knew this didn't you. So what's the amount? \n > ");
+	printf("Welcome to the Secret Sauce. You are a worker for Kroger\n");
+	printf("and are trying to steal the secret sauce percentage from world\n");
+	printf("leader in sauces ''Jamison and Jarrod Sauce Inc.'' Of course \n");
+	printf("you already knew this didn't you. So what's the amount? \n > ");
 
 	while ((lives>0) && (r!=guess)){
 		scanf("%d",&guess);
@@ -778,7 +798,7 @@ void secretSauce(void){
 		}else if (guess == -42){
 			printf("You quit with the secret code. Goodbye.\n");
 			return;
-		}else if(guess>100){
+		}else if(guess>100 || guess<0){
 			printf("Please enter a number between zero and 100.");
 		}else if(guess<r){
 			printf("Too low. %d lives remain. Try again. \n > ",lives);
