@@ -364,8 +364,8 @@ void do_ignore_singleton(void)
 
 void do_killall(char **argv)
 {
-  	if(argv[1]==NULL){
-  		printf("Killall command must be followed by a delay.\n");
+  	if((argv[1]==NULL)||(!isdigit(argv[1][0]))){
+  		printf("Killall command must be followed by am integer delay.\n");
   		return;
   	}
   	alarm(atoi(argv[1]));
@@ -486,11 +486,22 @@ void sigchld_handler(int sig)
 void sigalrm_handler(int sig)
 {
 	int mx = maxjid(jobs);
-	for (int i=0;i<mx;i++){
+	int i = 0;
+	// while (jobs[i].pid != 0){
+	// 	kill(-jobs[i].pid,SIGINT);
+	// 	removejob(jobs,jobs[i].pid);
+	// }
+
+	//Still buggy
+	while (i<(mx-1)){
+		printf("%d\n",i);
 		if (jobs[i].pid != 0){
 			kill(-jobs[i].pid,SIGINT);
 			removejob(jobs,jobs[i].pid);
+			i--;
 		}
+		i++;
+		mx = maxjid(jobs);
 	}
     return;
 }
