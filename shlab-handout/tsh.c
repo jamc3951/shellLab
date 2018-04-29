@@ -231,9 +231,11 @@ void eval(char *cmdline)
     		sigprocmask(SIG_UNBLOCK,&mask,NULL);
     		waitfg(pid); //wait for command to finish
     	}else{
+            addjob(jobs,pid,BG,buf);
     		sigprocmask(SIG_UNBLOCK,&mask,NULL);
-    		printf("%d %s",pid, cmdline);//Else prints background info
-    		addjob(jobs,pid,BG,buf);
+    		//Else prints background info
+            int job_id = get_jid_from_pid(pid);
+    		printf("[%d] (%d) %s", job_id, pid, cmdline);
     	}
     }
     return;
@@ -316,18 +318,18 @@ int is_builtin_cmd(char **argv)
 		do_exit();
 	}
 	else if (!strcmp(argv[0], "jobs")){
-		printf("Implement me please. %s wants to be a real boy.\n", argv[0]);
+
 		do_show_jobs();
-		return 1;
+		return BLTN_IGNR;
 	}
 	else if ((!strcmp(argv[0], "fg"))||(!strcmp(argv[0], "bg"))){
-		printf("Implement me please. %s wants to be a real boy.\n", argv[0]);
+
 		do_bgfg(argv);
-		return 1;
+		return BLTN_BGFG;
 	}
 	else if (!strcmp(argv[0], "killall")){
 		do_killall(argv);
-		return 1;
+		return BLTN_KILLALL;
 	}
 	else if (!strcmp(argv[0], "SecretSauce")){
 		secretSauce();
@@ -442,7 +444,7 @@ void sigchld_handler(int sig)
 	pid_t pid; 
 	while((pid = waitpid(-1,&status,WNOHANG|WUNTRACED))>0){ 
 		int jid = get_jid_from_pid(pid);
-		printf("pid: %d \n",pid);
+		//printf("pid: %d \n",pid);
 		if (WIFEXITED(status)){ //normal exit
 			removejob(jobs,pid);
 
@@ -468,7 +470,7 @@ void sigalrm_handler(int sig)
 	for (int i=0;i<mx;i++){
 		if (jobs[i].pid != 0){
 			kill(-jobs[i].pid,SIGINT);
-			removejob(jobs,jobs[i].pid);
+			//removejob(jobs,jobs[i].pid);
 		}
 	}
     return;
@@ -486,8 +488,8 @@ void sigint_handler(int sig)
     printf("Terminating after receipt of SIGINT signal\n");
     pid_t pid = fgpid(jobs);
     printf("%d \n",pid);
-    if (pid!=0){
-    	kill(-pid,sig);
+    if (pid>0){
+    	kill(-pid,SIGINT);
     }
     return;
 
@@ -501,8 +503,8 @@ void sigint_handler(int sig)
 void sigtstp_handler(int sig) 
 {
     pid_t pid = fgpid(jobs);
-    if (pid!=0){
-    	kill(-pid,sig);
+    if (pid>0){
+    	kill(-pid,SIGTSTP);
     }
     return;
 }
