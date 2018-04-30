@@ -369,6 +369,7 @@ void do_killall(char **argv)
   		return;
   	}
   	alarm(atoi(argv[1]));
+  	pause();
   	return;
 }
 
@@ -486,22 +487,16 @@ void sigchld_handler(int sig)
 void sigalrm_handler(int sig)
 {
 	int mx = maxjid(jobs);
-	int i = 0;
-	// while (jobs[i].pid != 0){
-	// 	kill(-jobs[i].pid,SIGINT);
-	// 	removejob(jobs,jobs[i].pid);
-	// }
-
-	//Still buggy
-	while (i<(mx-1)){
-		printf("%d\n",i);
+	sigset_t mask;
+	sigemptyset(&mask);
+	sigaddset(&mask,SIGCHLD);
+	for (int i=0;i<mx;i++){
 		if (jobs[i].pid != 0){
+			sigprocmask(SIG_BLOCK, &mask, NULL);
 			kill(-jobs[i].pid,SIGINT);
-			removejob(jobs,jobs[i].pid);
-			i--;
+			sigprocmask(SIG_UNBLOCK,&mask,NULL);
+			pause();
 		}
-		i++;
-		mx = maxjid(jobs);
 	}
     return;
 }
@@ -518,7 +513,6 @@ void sigint_handler(int sig)
     pid_t pid = fgpid(jobs);
     if (pid>0){
     	kill(-pid,SIGINT);
-    	//removejob(jobs,pid);
     }
     return;
 
@@ -532,10 +526,8 @@ void sigint_handler(int sig)
 void sigtstp_handler(int sig) 
 {
     pid_t pid = fgpid(jobs);
-    //struct job_t* task = getprocessid(jobs,pid);
     if (pid>0){
     	kill(-pid,SIGTSTP);
-    	//task->jid=ST;
     }
     return;
 }
