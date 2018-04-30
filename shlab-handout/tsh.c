@@ -108,6 +108,8 @@ pid_t Fork(void);
 
 void secretSauce(void);
 
+
+
 /*
  * main - The shell's main routine 
  */
@@ -178,6 +180,7 @@ int main(int argc, char **argv)
 
 
 
+
 /* 
  * eval - Evaluate the command line that the user has just typed in
  * 
@@ -197,27 +200,25 @@ to then unblock SIGCHLD signals before it execs the new program.*/
 void eval(char *cmdline) 
 {
     char *argv[MAXARGS];
-    char buf[MAXLINE];
+    //char buf[MAXLINE];
     int bg;
     pid_t pid;
     sigset_t mask;
-
-
-    strcpy(buf,cmdline);		
-    bg = parseline(buf,argv);
+	
+    bg = parseline(cmdline,argv);
     if (argv[0]==NULL){
     	return;
     }
 
-    if(!is_builtin_cmd(argv))
+    if(!is_builtin_cmd(argv)) 
     {
-    	sigemptyset(&mask);
-    	sigaddset(&mask,SIGCHLD);
-    	sigprocmask(SIG_BLOCK, &mask, NULL); 
-    	if((pid=Fork())==0){
-    		sigprocmask(SIG_UNBLOCK, &mask, NULL);
+    	sigemptyset(&mask); //etablsih the signal mask
+    	sigaddset(&mask,SIGCHLD); //set the SIGCHLD bit
+    	sigprocmask(SIG_BLOCK, &mask, NULL); //block signals with the mask
+    	if((pid=Fork())==0){ //wrapper Fork
+    		sigprocmask(SIG_UNBLOCK, &mask, NULL); //in child, unblock the SIGCHLD
     		setpgid(0,0); //What the assignment said to do
-    		if (execve(argv[0],argv, environ) <0){
+    		if (execve(argv[0],argv, environ) <0){ 
     			printf("%s: Command not found.\n",argv[0]);
     			exit(0);
     		}
@@ -225,13 +226,15 @@ void eval(char *cmdline)
 
     	//Add job to system
     	if (!bg){
-    		if(!addjob(jobs,pid,FG,buf)){
+    		if(!addjob(jobs,pid,FG,cmdline)){ //basically just makes sure the job can't overflow the job list
     			return;
     		}
     		sigprocmask(SIG_UNBLOCK,&mask,NULL);
     		waitfg(pid); //wait for command to finish
     	}else{
-            addjob(jobs,pid,BG,buf);
+    		if(!addjob(jobs,pid,BG,cmdline)){ //basically just makes sure the job can't overflow the job list
+    			return;
+    		}
     		sigprocmask(SIG_UNBLOCK,&mask,NULL);
     		//Else prints background info
             int job_id = get_jid_from_pid(pid);
@@ -356,7 +359,7 @@ void do_show_jobs(void)
 /*
  * do_ignore_singleton - Display the message to ignore a singleton '&'
  */
-void do_ignore_singleton(void)
+void do_ignore_singleton(void) //this function is never tested in the traces, but it works.
 {
 	printf("Ignoring Singleton '&'!\n");
   	return;
@@ -365,11 +368,11 @@ void do_ignore_singleton(void)
 void do_killall(char **argv)
 {
   	if((argv[1]==NULL)||(!isdigit(argv[1][0]))){
-  		printf("Killall command must be followed by am integer delay.\n");
+  		printf("killall command must be followed by am integer delay.\n");
   		return;
   	}
-  	alarm(atoi(argv[1]));
-  	pause();
+  	alarm(atoi(argv[1])); //send the alarm signal
+  	pause();//wait for alarm function to kill all children
   	return;
 }
 
@@ -415,16 +418,16 @@ void do_bgfg(char **argv)
 
 	//The job exists
 	if(!strcmp(argv[0],"fg")){ //job will be foreground
-		kill(-(jobby->pid),SIGCONT);
-		jobby->state = FG;
-		waitfg(jobby->pid);
+		kill(-(jobby->pid),SIGCONT); //restart process
+		jobby->state = FG; //update job list
+		waitfg(jobby->pid); //wait for job to finish
 
 	}
 	else{
 		//command is background
-		kill(-(jobby->pid),SIGCONT);
-		jobby->state = BG;
-		printf("[%d] (%d) %s", jid, jobby->pid, jobby->cmdline);
+		kill(-(jobby->pid),SIGCONT); //resart
+		jobby->state = BG; //update
+		printf("[%d] (%d) %s", jid, jobby->pid, jobby->cmdline); //notify user
 	}
     return;
 }
@@ -438,10 +441,10 @@ void waitfg(pid_t pid)
 	if (pid ==0){
 		return;
 	}
-	while(fgpid(jobs)!=0){    ////Un-comment when the jobs array is working. Meaniing sigchild needs to be working.
+	while(fgpid(jobs)!=0){ 
 		sleep(0);
 	}
-	removejob(jobs,0);
+	removejob(jobs,0);//Remember to remove the dead job since it could have been started from the background
 	return;
 }
 
@@ -459,21 +462,20 @@ void waitfg(pid_t pid)
  */
 void sigchld_handler(int sig) 
 {
-	//one call to waitpid
+	//"one call to waitpid" - Doc
 	int status;
 	pid_t pid; 
-	while((pid = waitpid(-1,&status,WNOHANG|WUNTRACED))>0){ 
-		//printf("pid: %d \n",pid);
+	while((pid = waitpid(-1,&status,WNOHANG|WUNTRACED))>0){ //While there are children to reap
 		if (WIFSTOPPED(status)){//job is stopped
 			struct job_t* task = getprocessid(jobs,pid);
-			task->state = ST;
+			task->state = ST; //Update status
     		printf("Job [%d] (%d) stopped by signal %d\n",task->jid,task->pid,WSTOPSIG(status));
     	}else if (WIFSIGNALED(status)){//normally terminated (ctrl-c)
 			struct job_t* task = getprocessid(jobs,pid);
 			printf("Job [%d] (%d) terminated by signal %d\n",task->jid,task->pid,WTERMSIG(status));
-			removejob(jobs,pid);
+			removejob(jobs,pid); //remove the ended job
 		}else if (WIFEXITED(status)){ //normal exit
-			removejob(jobs,pid);
+			removejob(jobs,pid); //also remove the ended job from list
 		}
 	}
     return;
@@ -489,7 +491,7 @@ void sigalrm_handler(int sig)
 	int mx = maxjid(jobs);
 	sigset_t mask;
 	sigemptyset(&mask);
-	sigaddset(&mask,SIGCHLD);
+	sigaddset(&mask,SIGCHLD);//Need to wait for every killed child to match output of trace 3
 	for (int i=0;i<mx;i++){
 		if (jobs[i].pid != 0){
 			sigprocmask(SIG_BLOCK, &mask, NULL);
@@ -535,26 +537,6 @@ void sigtstp_handler(int sig)
 /*********************
  * End signal handlers
  *********************/
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -784,7 +766,7 @@ pid_t Fork(void)
 }
 
 
-void secretSauce(void){
+void secretSauce(void){//Secret Function for Fun
 	srand(time(NULL));
 	int r = rand() % 100;
 	int lives = 6,guess;
@@ -804,11 +786,11 @@ void secretSauce(void){
 		}else if(guess>100 || guess<0){
 			printf("Please enter a number between zero and 100.");
 		}else if(guess<r){
+			lives--;
 			printf("Too low. %d lives remain. Try again. \n > ",lives);
-			lives--;
 		}else{
-			printf("Too high. %d lives remain. Try again. \n > ",lives);
 			lives--;
+			printf("Too high. %d lives remain. Try again. \n > ",lives);
 		}
 	}
 	printf("You ran out of lives. You lose.\n");
